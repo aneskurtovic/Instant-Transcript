@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% if state == "done" and row %}
+  <title>{{ row.title or "Transcript" }} — Instant Transcript</title>
+  {% else %}
+  <title>Transcript — Instant Transcript</title>
+  {% endif %}
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="container">
+    {% if state == "missing" %}
+      <section class="card">
+        <h1>Not found</h1>
+        <p class="muted">No transcript exists for this link. It may have expired and been purged.</p>
+        <p><a href="/">&larr; Make a new one</a></p>
+      </section>
+
+    {% elif state == "expired" %}
+      <section class="card">
+        <h1>Link expired (410 Gone)</h1>
+        <p class="muted">This transcript has passed its expiry date and is no longer available.</p>
+        <p><a href="/">&larr; Make a new one</a></p>
+      </section>
+
+    {% elif state in ["queued", "processing"] %}
+      <section class="card" id="pending" data-id="{{ id }}">
+        <div class="spinner"></div>
+        <h1>Transcribing…</h1>
+        <p class="muted">Downloading audio and running Whisper locally. This page will refresh automatically.</p>
+        <noscript><p>Reload the page in a minute to check progress.</p></noscript>
+      </section>
+      <script>
+        // Lightweight auto-refresh while the job runs.
+        setTimeout(function () { window.location.reload(); }, 5000);
+      </script>
+
+    {% elif state == "error" %}
+      <section class="card error-box">
+        <h1>Transcription failed</h1>
+        <p>{{ row.error or "Unknown error." }}</p>
+        <p><a href="/">&larr; Try another link</a></p>
+      </section>
+
+    {% else %}
+      {# state == done — transcript is server-rendered into the body. #}
+      <article class="card transcript-page">
+        <h1>{{ row.title or "Transcript" }}</h1>
+        <p class="meta muted">
+          <a href="{{ row.youtube_url }}" rel="noreferrer">{{ row.youtube_url }}</a><br />
+          Language: {{ row.language or "unknown" }} ·
+          Whisper {{ row.model }} (local) ·
+          <a href="{{ raw_url }}">raw text →</a>
+        </p>
+
+        <div class="copy-row">
+          <button type="button" class="copy-btn" data-copy-text="transcript-body">Copy transcript</button>
+          <a class="copy-btn linkish" href="{{ raw_url }}">Open raw (for AI)</a>
+        </div>
+
+        {% if segments %}
+          <div class="transcript" id="transcript-body">
+            {% for seg in segments %}<p class="seg"><span class="ts">[{{ '%0.0f'|format(seg.start // 60) }}:{{ '%02.0f'|format(seg.start % 60) }}]</span> {{ seg.text }}</p>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="transcript" id="transcript-body">{{ row.transcript }}</div>
+        {% endif %}
+
+        <footer class="transcript-footer muted">
+          Expires on {{ expires_human }} · generated {{ created_human }}.
+          Anyone with this link can read it.
+        </footer>
+      </article>
+    {% endif %}
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
