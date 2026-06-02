@@ -20,53 +20,85 @@ HTML body (no JavaScript required to read it).
 - 🧹 **Auto-expiry**: a background loop purges expired rows; expired links return **410 Gone**.
 - ⏱️ **Timestamped segments** stored and rendered on the transcript page.
 - 🛡️ **Guardrails**: max video length, rate limiting, optional yt-dlp cookie fallback.
-- 📦 **One container**: `Dockerfile` bundles Python + ffmpeg.
+- 📦 **One-command setup**: Docker Compose or a single `run.sh` — no manual steps.
 
 ---
 
-## Quickstart (local)
+## 🚀 One-command setup
 
-Requires **Python 3.10+** and **ffmpeg** installed on the host.
+Pick whichever you have. Both start the app at **<http://localhost:8000>** with
+sensible defaults — no config needed.
 
-```bash
-# 1. Install ffmpeg (Debian/Ubuntu)
-sudo apt-get install -y ffmpeg            # macOS: brew install ffmpeg
-
-# 2. Install Python deps
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-# 3. Configure (optional — sensible defaults otherwise)
-cp .env.example .env
-
-# 4. Run
-uvicorn app.main:app --reload
-```
-
-Open <http://localhost:8000>, paste a YouTube URL, and hit **Transcribe**.
-
-> The first run downloads the Whisper model (cached afterwards). `medium` on CPU is
-> fine for short clips; use `large-v3` on a GPU for best quality / longer videos.
-
----
-
-## Quickstart (Docker)
+### Option A — Docker (recommended, nothing to install but Docker)
 
 ```bash
-docker build -t instant-transcript .
-
-docker run --rm -p 8000:8000 \
-  -e BASE_URL=http://localhost:8000 \
-  -e WHISPER_MODEL=small \
-  -v "$(pwd)/data:/data" \
-  instant-transcript
+docker compose up
 ```
 
-The `-v .../data:/data` volume persists the SQLite DB, temp audio, and the model
-cache across restarts.
+That's it. It builds the image (Python + ffmpeg + deps), starts the server, and
+persists everything (DB, temp audio, the downloaded Whisper model) in `./data`.
+To run it detached: `docker compose up -d`. To stop: `docker compose down`.
+
+### Option B — Local (Python 3.10+)
+
+```bash
+./run.sh
+```
+
+The script creates a virtualenv, installs dependencies, seeds `.env`, checks for
+ffmpeg, and launches the server. On Windows, run `run.bat` instead.
+
+> Prefer `make`? `make docker` (Option A) · `make run` (Option B) · `make help`
+> for everything else.
+
+Then open <http://localhost:8000>, paste a YouTube URL, and hit **Transcribe**.
+
+> **First run** downloads the Whisper model (cached afterwards, so subsequent runs
+> start fast). The default `small` model runs comfortably on CPU; switch to
+> `large-v3` on a GPU for best quality / longer videos (see Configuration).
+
+### Prerequisites
+
+- **Docker route:** just [Docker](https://docs.docker.com/get-docker/) (Compose v2 is built in).
+- **Local route:** **Python 3.10+** and **ffmpeg**
+  (`sudo apt-get install -y ffmpeg` · macOS: `brew install ffmpeg`).
+  `run.sh` warns you if ffmpeg is missing.
 
 **GPU:** base the image on an `nvidia/cuda` runtime image, run with
-`--gpus all`, and set `DEVICE=cuda COMPUTE_TYPE=float16`.
+`--gpus all`, and set `DEVICE=cuda COMPUTE_TYPE=float16` (e.g. in `.env`).
+
+---
+
+## Languages
+
+Transcription uses OpenAI's Whisper (via `faster-whisper`), which supports
+**~99 languages** with **automatic language detection**. Leave the language field
+empty (the default) and Whisper detects it from the audio; the detected code is
+shown on the transcript page and in the `/raw` header.
+
+To **force** a language — useful for short or noisy clips where auto-detect
+guesses wrong — pass an ISO 639-1 code in the UI's "Force language" field or in
+the API body (`"language": "bs"`).
+
+Auto-detect works well for **ex-Yugoslav languages** — Bosnian (`bs`),
+Croatian (`hr`), Serbian (`sr`). For the best quality on these, use the
+`large-v3` model (GPU recommended).
+
+<details>
+<summary><strong>Full list of supported language codes</strong></summary>
+
+```
+af  am  ar  as  az  ba  be  bg  bn  bo  br  bs  ca  cs  cy  da  de  el  en  es
+et  eu  fa  fi  fo  fr  gl  gu  ha  haw he  hi  hr  ht  hu  hy  id  is  it  ja
+jw  ka  kk  km  kn  ko  la  lb  ln  lo  lt  lv  mg  mi  mk  ml  mn  mr  ms  mt
+my  ne  nl  nn  no  oc  pa  pl  ps  pt  ro  ru  sa  sd  si  sk  sl  sn  so  sq
+sr  su  sv  sw  ta  te  tg  th  tk  tl  tr  tt  uk  ur  uz  vi  yi  yo  zh
+```
+
+(`yue` — Cantonese — is additionally supported by `large-v3`.) Codes are
+ISO 639-1 where one exists. Quality varies by language and model size; bigger
+models handle low-resource languages noticeably better.
+</details>
 
 ---
 
@@ -76,7 +108,7 @@ All settings are environment variables (see [`.env.example`](.env.example)).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `WHISPER_MODEL` | `medium` | `tiny`/`base`/`small`/`medium`/`large-v3`. |
+| `WHISPER_MODEL` | `small` | `tiny`/`base`/`small`/`medium`/`large-v3`. Bigger = better + slower. |
 | `DEVICE` | `cpu` | `cpu` or `cuda`. |
 | `COMPUTE_TYPE` | `int8` | `int8` (CPU) or `float16` (GPU). |
 | `DEFAULT_TTL_HOURS` | `168` | Default link lifetime (7 days). |
@@ -169,6 +201,9 @@ app/
   templates/        # index.html (submit) + transcript.html (SSR)
   static/           # style.css + app.js
 data/               # sqlite db + temp audio + model cache (gitignored)
+run.sh / run.bat    # one-command local setup + run
+docker-compose.yml  # one-command Docker run
+Makefile            # make run | make docker | make help
 requirements.txt
 .env.example
 Dockerfile

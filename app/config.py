@@ -31,7 +31,9 @@ class Settings:
 
     def __init__(self) -> None:
         # --- Whisper / transcription ---
-        self.whisper_model: str = os.getenv("WHISPER_MODEL", "medium")
+        # `small` is the out-of-box default: fast on CPU, decent quality.
+        # Bump to `medium` / `large-v3` (GPU recommended) for best results.
+        self.whisper_model: str = os.getenv("WHISPER_MODEL", "small")
         self.device: str = os.getenv("DEVICE", "cpu")
         self.compute_type: str = os.getenv("COMPUTE_TYPE", "int8")
 

@@ -1,0 +1,24 @@
+# One-command run:  docker compose up
+#
+# Builds the image (python + ffmpeg + deps) and starts the app on
+# http://localhost:8000. The ./data volume persists the SQLite DB, temp audio,
+# and the downloaded Whisper model so restarts are instant.
+services:
+  app:
+    build: .
+    image: instant-transcript
+    ports:
+      - "8000:8000"
+    # Read overrides from .env if present (optional — sane defaults otherwise).
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Defaults chosen so it just works on a CPU-only machine out of the box.
+      BASE_URL: ${BASE_URL:-http://localhost:8000}
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      DEVICE: ${DEVICE:-cpu}
+      COMPUTE_TYPE: ${COMPUTE_TYPE:-int8}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
